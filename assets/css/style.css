@@ -164,10 +164,10 @@ figcaption { color: var(--muted); font-size: 13px; margin-top: 8px; }
 
 /* video */
 video {
-  width: min(360px, 100%); border-radius: 14px; border: 1px solid var(--border);
+  width: min(720px, 100%); border-radius: 14px; border: 1px solid var(--border);
   background: #000; box-shadow: var(--shadow);
 }
-video.wide { width: 100%; max-width: 880px; }
+video.wide { width: 100%; max-width: 960px; }
 
 /* table */
 table {
