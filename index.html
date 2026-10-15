@@ -1,86 +1,79 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>陈凯文的作品集</title>
+<title>Kaiwen Chen — Portfolio</title>
 <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
 <nav class="nav">
   <div class="wrap">
-    <span class="brand">陈凯文的作品集</span>
+    <span class="brand">Kaiwen Chen's Portfolio</span>
     <div class="links">
-      <a href="#projects">项目</a>
-      <a href="projects/dissertation.html">毕业论文</a>
-      <a href="projects/gongmu.html">量化策略</a>
-      <a href="projects/android.html">安卓开发</a>
-      <a href="projects/harmony.html">鸿蒙开发</a>
-      <a href="projects/video.html">视频创作</a>
+      <a href="#projects">Projects</a>
+      <a href="projects/research.html">ML Research</a>
+      <a href="projects/gongmu.html">Quant Strategy</a>
+      <a href="projects/stockapp.html">Stock App</a>
+      <a href="projects/video.html">Video</a>
+      <a href="projects/opengl.html">3D Scene</a>
     </div>
   </div>
 </nav>
 
 <header class="hero wrap">
-  <h1>陈凯文的作品集</h1>
-  <p class="sub">金融科技 / 数字媒体技术 — 量化研究 · 移动应用开发 · 三维图形 · 视频创作</p>
+  <h1>Kaiwen Chen's Portfolio</h1>
+  <p class="sub">Quantitative Research · Mobile App Development · 3D Graphics · Video Production</p>
   <p class="meta">
-    <span>学号：112301228</span>
-    <span>学院：物理与信息工程学院</span>
-    <span>年级：2024级</span>
+    <span>Student ID: 112301228</span>
+    <span>School of Physics &amp; Information Engineering</span>
+    <span>Digital Media Technology, 2024</span>
   </p>
 </header>
 
 <main class="wrap" id="projects">
   <div class="grid">
 
-    <a class="card" href="projects/dissertation.html">
-      <span class="tag">作品集项目 1 · 小组毕业论文</span>
-      <h3>机器学习投资组合改进研究</h3>
-      <p>以沪深50成分股为样本，结合五类机器学习模型（随机森林、XGBoost、LightGBM、LSTM、LSTM-Attention）与三种经典组合构建方法（等权、风险平价、最大夏普比率），研究模型预测差异对组合表现的提升效应。本人负责方法部分撰写、论文排版与团队协调。</p>
-      <span class="go">查看项目 →</span>
+    <a class="card" href="projects/research.html">
+      <span class="tag">Project 1 · External Research (Group)</span>
+      <h3>Machine Learning Portfolio Improvement Research</h3>
+      <p>An off-campus research project on China's stock market: five machine learning models (Random Forest, XGBoost, LightGBM, LSTM, LSTM-Attention) paired with three classic portfolio construction methods on SSE 50 constituents. I wrote the Methodology section, validated experimental data, and handled typesetting.</p>
+      <span class="go">View project →</span>
     </a>
 
     <a class="card" href="projects/gongmu.html">
-      <span class="tag">作品集项目 2 · 个人项目</span>
-      <h3>公募基金加仓策略量化回测</h3>
-      <p>基于公募基金季度持仓披露数据构建"增仓比例前5"选股策略，并加入股东增减持比值与指数回撤的牛熊筛选机制：熊市清仓转国债、牛市执行选股。2010–2026 年回测总收益约 416%。</p>
-      <span class="go">查看项目 →</span>
+      <span class="tag">Project 2 · Personal</span>
+      <h3>Fund-Increase Strategy Quantitative Backtest</h3>
+      <p>A full Python quant pipeline: quarterly stock selection from mutual-fund holdings ("top-5 by fund increase ratio"), filtered by a bull/bear regime detector built from shareholder increase/decrease ratios and index drawdowns. Total return of ~416% over the 2010–2026 backtest.</p>
+      <span class="go">View project →</span>
     </a>
 
-    <a class="card" href="projects/android.html">
-      <span class="tag">作品集项目 3 · 个人项目</span>
-      <h3>模拟炒股 Android 应用开发</h3>
-      <p>基于 Jetpack Compose + Material3 + Room + Retrofit 的全市场 A 股模拟炒股应用：实时行情、K 线分析、模拟交易、持仓盈亏统计、交易日历、收益曲线与 AI 智能助手。</p>
-      <span class="go">查看项目 →</span>
-    </a>
-
-    <a class="card" href="projects/harmony.html">
-      <span class="tag">作品集项目 4 · 个人项目</span>
-      <h3>模拟炒股鸿蒙应用开发</h3>
-      <p>同一业务在 HarmonyOS NEXT 平台的原生实现：ArkTS 声明式 UI、@StorageLink 跨组件数据同步、Canvas 自绘 K 线图，通过 Python Flask 代理对接新浪财经 API。</p>
-      <span class="go">查看项目 →</span>
+    <a class="card" href="projects/stockapp.html">
+      <span class="tag">Project 3 · Personal</span>
+      <h3>Stock Trading Simulation App (Android &amp; HarmonyOS)</h3>
+      <p>A full-market A-share simulated trading app implemented natively on both platforms: Jetpack Compose on Android and ArkTS on HarmonyOS NEXT. Live quotes, K-line charts, simulated trading, portfolio analytics and an AI assistant, all via a Python Flask proxy to Sina Finance API.</p>
+      <span class="go">View project →</span>
     </a>
 
     <a class="card" href="projects/video.html">
-      <span class="tag">作品集项目 5 · 小组项目</span>
-      <h3>光学原理演示视频创作（AE 特效）</h3>
-      <p>三人小组分工制作的科普演示视频。本人负责约 1 分钟的中间段落：使用 After Effects + Element 3D 插件制作房屋、小孔成像与光圈的三维动画，并承担全片剪辑、字幕与 AI 配音合成。</p>
-      <span class="go">查看项目 →</span>
+      <span class="tag">Project 4 · Group Project</span>
+      <h3>Optics Principle Demo Video (AE Effects)</h3>
+      <p>A three-person science demo video on optics (housing scene, pinhole imaging, aperture). I produced the ~1-minute middle segment with After Effects + Element 3D, and edited the full film with subtitles and AI voice-over.</p>
+      <span class="go">View project →</span>
     </a>
 
     <a class="card" href="projects/opengl.html">
-      <span class="tag extra">附加课程项目</span>
-      <h3>《雪庐夜话》3D 场景（OpenGL）</h3>
-      <p>3D 程序设计基础期末作品：血月雪夜场景，第三人称 Demon 角色（Mixamo 骨骼动画）、FBX/3DS 双通道模型导入、DirectInput 交互、粒子降雪与昼夜光照切换。</p>
-      <span class="go">查看项目 →</span>
+      <span class="tag">Project 5 · Personal</span>
+      <h3>"Snow Cottage Night Talk" 3D Scene (OpenGL)</h3>
+      <p>A C++/OpenGL final project: a blood-moon snow scene with a third-person Demon character (Mixamo skeletal animation), dual FBX/3DS model pipelines, DirectInput interaction, particle snowfall and day/night lighting.</p>
+      <span class="go">View project →</span>
     </a>
 
   </div>
 </main>
 
 <footer class="footer">
-  <div>© 2026 陈凯文 · 112301228 · 物理与信息工程学院 数字媒体技术专业</div>
+  <div>© 2026 Kaiwen Chen · 112301228 · School of Physics &amp; Information Engineering</div>
 </footer>
 </body>
 </html>

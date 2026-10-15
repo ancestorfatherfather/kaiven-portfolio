@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stock Trading Simulation App (Android &amp; HarmonyOS) — Kaiwen Chen</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+<nav class="nav">
+  <div class="wrap">
+    <span class="brand"><a href="../index.html" style="color:var(--text)">Kaiwen Chen's Portfolio</a></span>
+    <div class="links">
+      <a href="research.html">ML Research</a>
+      <a href="gongmu.html">Quant Strategy</a>
+      <a href="stockapp.html">Stock App</a>
+      <a href="video.html">Video</a>
+      <a href="opengl.html">3D Scene</a>
+    </div>
+  </div>
+</nav>
+
+<div class="page-head wrap">
+  <div class="crumb"><a href="../index.html">Home</a> / Project 3</div>
+  <h1>Stock Trading Simulation App</h1>
+  <p class="info">One project, two native platforms: Android (Jetpack Compose) &amp; HarmonyOS NEXT (ArkTS) · Personal project</p>
+</div>
+
+<main class="wrap">
+
+<section class="block">
+  <h2>1. Overview</h2>
+  <p>A full-market A-share <strong>simulated trading application implemented natively on both Android and HarmonyOS</strong>. Both clients talk to a Python Flask proxy that forwards requests to the Sina Finance API (solving cross-origin and GBK-encoding issues) with server-side SQLite persistence. Features: live quotes for the entire market (SSE/SZSE/STAR/BSE), search by code / Chinese name / pinyin, watchlists, multi-period K-line charts drawn on Canvas, limit-order simulated trading with position and P&amp;L accounting, trading calendar, equity-curve charts and an AI assistant. New accounts start with ¥1,000,000 in simulated capital.</p>
+  <table>
+    <tr><th>Android</th><td>Kotlin · Jetpack Compose · Material3 · Navigation Compose · Room · Retrofit + OkHttp · Coroutines · Canvas</td></tr>
+    <tr><th>HarmonyOS</th><td>ArkTS / ETS · ArkUI declarative components · @StorageLink / @Watch · Canvas · Preferences · http module (API 6.0.1)</td></tr>
+    <tr><th>Backend</th><td>Python Flask proxy → Sina Finance API · SQLite storage · GBK decoding</td></tr>
+    <tr><th>Data tables</th><td>trade / position / user_account / watchlist / asset_snapshot</td></tr>
+  </table>
+</section>
+
+<section class="block">
+  <h2>2. Demo videos</h2>
+  <p><strong>Android version:</strong></p>
+  <figure>
+    <video controls preload="metadata" poster="../assets/img/android_登陆页面.jpg">
+      <source src="../assets/video/android.mp4" type="video/mp4">
+    </video>
+    <figcaption>Android app walkthrough: login → quotes → search → K-line → trading → positions → equity curve → AI assistant</figcaption>
+  </figure>
+  <p><strong>HarmonyOS version:</strong></p>
+  <figure>
+    <video controls preload="metadata" poster="../assets/img/harmony_登录首页.jpg">
+      <source src="../assets/video/harmony.mp4" type="video/mp4">
+    </video>
+    <figcaption>HarmonyOS app walkthrough — same feature set, native ArkTS implementation</figcaption>
+  </figure>
+</section>
+
+<section class="block">
+  <h2>3. Key code — Android</h2>
+  <h3>3.1 Networking: Retrofit API service</h3>
+  <pre><code>StockApiService.kt (API服务)
+package com.englearn.stock.service
+import com.englearn.stock.model.KLineItem
+import com.englearn.stock.model.MarketIndex
+import com.englearn.stock.model.Stock
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.net.URLEncoder
+import java.util.concurrent.TimeUnit
+class StockApiService {
+    private val gson = Gson()
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(20, TimeUnit.SECONDS)
+        .build()
+    companion object {
+        const val SERVER_IP = &quot;http://10.133.10.88:5000&quot;
+        private var instance: StockApiService? = null
+        fun getInstance(): StockApiService {
+            return instance ?: synchronized(this) {
+                instance ?: StockApiService().also { instance = it }
+            }
+        }
+    }
+    private suspend fun doGet(url: String): String = withContext(Dispatchers.IO) {
+        val request = Request.Builder().url(url).build()
+        val response = client.newCall(request).execute()
+        response.body?.string() ?: &quot;&quot;
+    }
+    private suspend fun doPost(url: String, json: String): String = withContext(Dispatchers.IO) {
+        val body = json.toRequestBody(&quot;application/json; charset=utf-8&quot;.toMediaType())
+        val request = Request.Builder().url(url).post(body).build()
+        val response = client.newCall(request).execute()
+        response.body?.string() ?: &quot;&quot;
+    }
+    suspend fun fetchAllStocks(market: String = &quot;all&quot;, page: Int = 1, pageSize: Int = 200): List&lt;Stock&gt; {
+        return try {
+            val url = &quot;$SERVER_IP/api/stocks?market=$market&amp;page=$page&amp;pageSize=$pageSize&quot;
+            val json = doGet(url)
+            val type = object : TypeToken&lt;Map&lt;String, Any&gt;&gt;() {}.type
+            val map: Map&lt;String, Any&gt; = gson.fromJson(json, type)
+            val stocksList = map[&quot;stocks&quot;] as? List&lt;*&gt; ?: emptyList&lt;Any&gt;()
+            stocksList.mapNotNull { item -&gt;
+                val s = item as? Map&lt;*, *&gt; ?: return@mapNotNull null
+                Stock(
+                    code = s[&quot;code&quot;]?.toString() ?: &quot;&quot;,
+                    name = s[&quot;name&quot;]?.toString() ?: &quot;&quot;,
+                    currentPrice = (s[&quot;currentPrice&quot;] as? Number)?.toDouble() ?: 0.0,
+                    changePercent = (s[&quot;changePercent&quot;] as? Number)?.toDouble() ?: 0.0,
+                    changeAmount = (s[&quot;changeAmount&quot;] as? Number)?.toDouble() ?: 0.0,
+                    volume = (s[&quot;volume&quot;] as? Number)?.toLong() ?: 0,
+                    todayOpen = (s[&quot;todayOpen&quot;] as? Number)?.toDouble() ?: 0.0,
+                    yesterdayClose = (s[&quot;yesterdayClose&quot;] as? Number)?.toDouble() ?: 0.0,
+                    highPrice = (s[&quot;highPrice&quot;] as? Number)?.toDouble() ?: 0.0,
+                    lowPrice = (s[&quot;lowPrice&quot;] as? Number)?.toDouble() ?: 0.0,
+                    market = s[&quot;market&quot;]?.toString() ?: &quot;&quot;
+                )
+            }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+    suspend fun fetchStockQuote(code: String): Stock? {
+        return try {
+            val json = doGet(&quot;$SERVER_IP/api/stock/$code&quot;)
+            val type = object : TypeToken&lt;Map&lt;String, Any&gt;&gt;() {}.type
+            val map: Map&lt;String, Any&gt; = gson.fromJson(json, type)</code></pre>
+  <h3>3.2 Trade service: funds &amp; position validation</h3>
+  <pre><code>TradeService.kt (交易服务)
+package com.englearn.stock.service
+import com.englearn.stock.db.AppDatabase
+import com.englearn.stock.model.*
+import java.text.SimpleDateFormat
+import java.util.*
+class TradeService(private val db: AppDatabase) {
+    private val api = StockApiService.getInstance()
+    private val sdf = SimpleDateFormat(&quot;yyyy-MM-dd HH:mm:ss&quot;, Locale.getDefault())
+    private val dateFmt = SimpleDateFormat(&quot;yyyy-MM-dd&quot;, Locale.getDefault())
+    suspend fun initAccount(userId: Long = 1) {
+        val existing = db.userAccountDao().getByUser(userId)
+        if (existing == null) {
+            db.userAccountDao().insert(UserAccount(
+                userId = userId,
+                username = &quot;admin&quot;,
+                totalAssets = 1000000.0,
+                availableFunds = 1000000.0,
+                createTime = sdf.format(Date()),
+                updateTime = sdf.format(Date())
+            ))
+        }
+    }
+    suspend fun getAccount(userId: Long = 1): UserAccount {
+        initAccount(userId)
+        return db.userAccountDao().getByUser(userId)!!
+    }
+    suspend fun buyStock(userId: Long, stockCode: String, quantity: Int, limitPrice: Double): TradeResult {
+        val account = getAccount(userId)
+        val stock = api.fetchStockQuote(stockCode) ?: return TradeResult(false, &quot;无法获取股票行情&quot;)
+        if (limitPrice &gt; stock.currentPrice) return TradeResult(false, &quot;限价不能高于当前市价 ${stock.currentPrice}&quot;)
+        val totalAmount = limitPrice * quantity
+        if (account.availableFunds &lt; totalAmount) return TradeResult(false, &quot;可用资金不足，需要 ¥${&quot;%.2f&quot;.format(totalAmount)}&quot;)
+        val trade = Trade(
+            userId = userId, stockCode = stockCode, stockName = stock.name,
+            tradeType = &quot;BUY&quot;, limitPrice = limitPrice, tradePrice = stock.currentPrice,
+            tradeQuantity = quantity, tradeAmount = stock.currentPrice * quantity,
+            tradeTime = sdf.format(Date()), status = &quot;COMPLETED&quot;
+        )
+        db.tradeDao().insert(trade)
+        val newFunds = account.availableFunds - trade.tradeAmount
+        db.userAccountDao().updateFunds(userId, newFunds, newFunds, sdf.format(Date()))
+        val existing = db.positionDao().getByStock(userId, stockCode)
+        if (existing != null) {
+            val totalQty = existing.quantity + quantity
+            val avgCost = (existing.costPrice * existing.quantity + trade.tradePrice * quantity) / totalQty
+            db.positionDao().update(existing.copy(
+                quantity = totalQty, costPrice = avgCost, currentPrice = stock.currentPrice,
+                profitLoss = (stock.currentPrice - avgCost) * totalQty,
+                profitLossPercent = if (avgCost &gt; 0) (stock.currentPrice - avgCost) / avgCost * 100 else 0.0,
+                updateTime = sdf.format(Date())
+            ))
+        } else {
+            db.positionDao().insert(Position(
+                userId = userId, stockCode = stockCode, stockName = stock.name,
+                quantity = quantity, costPrice = stock.currentPrice, currentPrice = stock.currentPrice,
+                updateTime = sdf.format(Date())
+            ))
+        }
+        recordSnapshot(userId)
+        return TradeResult(true, &quot;买入成功&quot;, trade)
+    }
+    suspend fun sellStock(userId: Long, stockCode: String, quantity: Int, limitPrice: Double): TradeResult {
+        val account = getAccount(userId)
+        val stock = api.fetchStockQuote(stockCode) ?: return TradeResult(false, &quot;无法获取股票行情&quot;)
+        if (limitPrice &lt; stock.currentPrice) return TradeResult(false, &quot;限价不能低于当前市价 ${stock.currentPrice}&quot;)
+        val position = db.positionDao().getByStock(userId, stockCode) ?: return TradeResult(false, &quot;无持仓&quot;)
+        if (position.quantity &lt; quantity) return TradeResult(false, &quot;持仓不足，当前持仓 ${position.quantity} 股&quot;)
+        val trade = Trade(
+            userId = userId, stockCode = stockCode, stockName = stock.name,</code></pre>
+  <h3>3.3 K-line screen: Canvas candlestick drawing</h3>
+  <pre><code>KLineScreen.kt (K线图)
+package com.englearn.stock.ui.kline
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.englearn.stock.model.KLineItem
+import com.englearn.stock.service.StockApiService
+import kotlinx.coroutines.launch
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun KLineScreen(stockCode: String, stockName: String, scale: String, onBack: () -&gt; Unit) {
+    val api = remember { StockApiService.getInstance() }
+    val scope = rememberCoroutineScope()
+    var klineData by remember { mutableStateOf&lt;List&lt;KLineItem&gt;&gt;(emptyList()) }
+    var selectedScale by remember { mutableStateOf(scale) }
+    val isIntraday = selectedScale == &quot;5&quot;
+    val title = if (isIntraday) &quot;分时图 - $stockName&quot; else &quot;K线 - $stockName&quot;
+    LaunchedEffect(selectedScale) {
+        val datalen = when (selectedScale) {
+            &quot;5&quot; -&gt; 48; &quot;1680&quot; -&gt; 60; &quot;7200&quot; -&gt; 36; else -&gt; 120
+        }
+        klineData = api.fetchKLineData(stockCode, selectedScale, datalen)
+    }
+    Scaffold(
+        topBar = {
+            TopAppBar(title = { Text(title) },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, &quot;返回&quot;) } })
+        }
+    ) { padding -&gt;
+        Column(modifier = Modifier.padding(padding)) {
+            // 切换按钮
+            LazyRow(modifier = Modifier.fillMaxWidth().padding(8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                val scales = listOf(&quot;5&quot; to &quot;分时&quot;, &quot;15&quot; to &quot;15分&quot;, &quot;30&quot; to &quot;30分&quot;, &quot;60&quot; to &quot;60分&quot;,
+                    &quot;120&quot; to &quot;120分&quot;, &quot;240&quot; to &quot;日K&quot;, &quot;1680&quot; to &quot;周K&quot;, &quot;7200&quot; to &quot;月K&quot;)
+                items(scales) { (s, label) -&gt;
+                    FilterChip(selected = selectedScale == s, onClick = { selectedScale = s }, label = { Text(label, fontSize = 12.sp) })
+                }
+            }
+            if (klineData.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    CircularProgressIndicator(modifier = Modifier.padding(32.dp))
+                }
+            } else {
+                Canvas(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                    if (isIntraday) {
+                        drawIntradayChart(klineData)
+                    } else {
+                        drawKLineChart(klineData)
+                    }
+                }
+            }
+        }
+    }
+}
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawIntradayChart(data: List&lt;KLineItem&gt;) {
+    // 深色背景
+    drawRect(Color(0xFF1A1A2E))
+    if (data.isEmpty()) return
+    val w = size.width
+    val h = size.height
+    val pad = 40f</code></pre>
+</section>
+
+<section class="block">
+  <h2>4. Key code — HarmonyOS</h2>
+  <h3>4.1 Data model &amp; state management</h3>
+  <pre><code>entry/src/main/ets/model/Stock.ets (数据模型)
+/**
+ * 股票数据模型
+ * 所有股票数据来源于网络API，本地不存储股票基础信息
+ */
+/**
+ * 股票实时行情
+ * 字段全部来自东方财富API
+ */
+export class Stock {
+  /** 股票代码，如：600000 */
+  code: string = &#x27;&#x27;;
+  /** 股票名称，如：浦发银行 */
+  name: string = &#x27;&#x27;;
+  /** 最新价 */
+  currentPrice: number = 0;
+  /** 涨跌幅（%） */
+  changePercent: number = 0;
+  /** 涨跌额 */
+  changeAmount: number = 0;
+  /** 成交量（手） */
+  volume: number = 0;
+  /** 今开 */
+  todayOpen: number = 0;
+  /** 昨收 */
+  yesterdayClose: number = 0;
+  /** 最高 */
+  highPrice: number = 0;
+  /** 最低 */
+  lowPrice: number = 0;
+  /** 市场板块 */
+  market: string = &#x27;&#x27;;
+  constructor() {}
+}
+/**
+ * 大盘指数
+ */
+export class MarketIndex {
+  /** 指数代码，如：1.000001 */
+  code: string = &#x27;&#x27;;
+  /** 指数名称 */
+  name: string = &#x27;&#x27;;
+  /** 最新点位 */
+  currentPrice: number = 0;
+  /** 涨跌幅（%） */
+  changePercent: number = 0;
+  /** 涨跌点数 */
+  changeAmount: number = 0;
+  constructor() {}
+}
+/**
+ * 交易记录模型
+ * 本地RDB存储，用于记录用户交易历史
+ */
+export class Trade {
+  /** 交易ID，主键 */
+  id: number = 0;
+  /** 用户ID */
+  userId: number = 0;
+  /** 股票代码 */
+  stockCode: string = &#x27;&#x27;;
+  /** 股票名称 */
+  stockName: string = &#x27;&#x27;;
+  /** 交易类型：BUY-买入，SELL-卖出 */
+  tradeType: string = &#x27;&#x27;;
+  /** 挂单价格（用户设定的限价） */
+  limitPrice: number = 0;
+  /** 成交价格（实际成交价，挂单未成交时为0） */
+  tradePrice: number = 0;
+  /** 交易数量（股） */
+  tradeQuantity: number = 0;
+  /** 交易金额 */
+  tradeAmount: number = 0;
+  /** 交易时间 */
+  tradeTime: string = &#x27;&#x27;;</code></pre>
+  <h3>4.2 Network service: http module + Flask proxy</h3>
+  <pre><code>entry/src/main/ets/service/StockApiService.ets (API服务)
+/**
+ * 股票联网数据服务
+ * 通过本机Flask代理服务器获取新浪财经实时A股行情数据
+ * 模拟器通过 http://10.133.10.88:5000 访问本机服务器
+ * 网络不可用时自动切换到模拟数据
+ */
+import { http } from &#x27;@kit.NetworkKit&#x27;
+import { Stock, MarketIndex } from &#x27;../model/Stock&#x27;
+// ==================== 服务器配置 ====================
+/** 代理服务器地址 */
+const SERVER_IP: string = &#x27;http://10.133.10.88:5000&#x27;
+/** 最大重试次数 */
+const MAX_RETRY: number = 2
+/** 请求超时（毫秒） */
+const REQUEST_TIMEOUT: number = 20000
+// ==================== 服务器响应接口定义 ====================
+/** 新浪股票数据（服务器解析后的格式） */
+interface SinaStockData {
+  code: string;
+  name: string;
+  currentPrice: number;
+  todayOpen: number;
+  yesterdayClose: number;
+  highPrice: number;
+  lowPrice: number;
+  volume: number;
+  amount: number;
+  changeAmount: number;
+  changePercent: number;
+  market: string;
+}
+/** 股票列表响应 */
+interface StocksResponse {
+  stocks: SinaStockData[];
+  count: number;
+  total: number;
+  page: number;
+  hasMore: boolean;
+}
+/** 单支股票响应（直接是SinaStockData） */
+// 直接使用SinaStockData
+/** 指数响应 */
+interface IndicesResponse {
+  indices: SinaStockData[];
+}
+/** 搜索响应 */
+interface SearchResponse {
+  stocks: SinaStockData[];
+  count: number;
+}
+/** 批量行情响应 */
+interface BatchResponse {
+  stocks: SinaStockData[];
+}
+/** K线数据项 */
+interface KLineItem {
+  day: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+/** K线响应 */
+interface KLineResponse {
+  kline: KLineItem[];
+  count: number;</code></pre>
+  <h3>4.3 K-line page: Canvas multi-period charts</h3>
+  <pre><code>entry/src/main/ets/pages/KLinePage.ets (K线图)
+/**
+ * K线图页面
+ * 蜡烛图 + 成交量柱状图 + 5/10/20/30/60日均线
+ */
+import { router } from &#x27;@kit.ArkUI&#x27;
+import { http } from &#x27;@kit.NetworkKit&#x27;
+interface KLineItem {
+  day: string
+  open: number
+  high: number
+  low: number
+  close: number
+  volume: number
+}
+interface KLineResponse {
+  kline: KLineItem[]
+  count: number
+}
+const SERVER_IP: string = &#x27;http://10.133.10.88:5000&#x27;
+@Entry
+@Component
+struct KLinePage {
+  @State stockCode: string = &#x27;&#x27;
+  @State stockName: string = &#x27;&#x27;
+  @State klineData: KLineItem[] = []
+  @State isLoading: boolean = false
+  @State errorMsg: string = &#x27;&#x27;
+  @State selectedScale: string = &#x27;240&#x27;
+  @State infoDay: string = &#x27;--&#x27;
+  @State infoOpen: string = &#x27;--&#x27;
+  @State infoClose: string = &#x27;--&#x27;
+  @State infoHigh: string = &#x27;--&#x27;
+  @State infoLow: string = &#x27;--&#x27;
+  @State infoVol: string = &#x27;--&#x27;
+  @State infoIsRise: boolean = true
+  @State chartReady: boolean = false
+  private mainSettings: RenderingContextSettings = new RenderingContextSettings(true)
+  private mainCtx: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.mainSettings)
+  private volSettings: RenderingContextSettings = new RenderingContextSettings(true)
+  private volCtx: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.volSettings)
+  private cw: number = 360
+  private ch: number = 300
+  private vh: number = 80
+  private maData: Map&lt;string, number[]&gt; = new Map()
+  aboutToAppear(): void {
+    const params = router.getParams() as Record&lt;string, string | number&gt;
+    this.stockCode = (params.stockCode as string) || &#x27;&#x27;
+    this.stockName = (params.stockName as string) || &#x27;&#x27;
+    const scaleParam: string = (params.scale as string) || &#x27;&#x27;
+    if (scaleParam === &#x27;5&#x27;) {
+      this.selectedScale = &#x27;5&#x27;
+    }
+    this.loadKLineData()
+  }
+  calcMA(data: KLineItem[], period: number): number[] {
+    const result: number[] = []
+    for (let i = 0; i &lt; data.length; i++) {
+      if (i &lt; period - 1) {
+        result.push(NaN)
+      } else {
+        let sum: number = 0
+        for (let j = i - period + 1; j &lt;= i; j++) {
+          sum += data[j].close
+        }
+        result.push(sum / period)
+      }
+    }
+    return result
+  }
+  async loadKLineData(): Promise&lt;void&gt; {
+    this.isLoading = true</code></pre>
+</section>
+
+<section class="block">
+  <h2>5. Screenshots — Android</h2>
+  <div class="gallery">
+    <figure><img loading="lazy" src="../assets/img/android_登陆页面.jpg" alt="Login"><figcaption>Login</figcaption></figure>
+    <figure><img loading="lazy" src="../assets/img/android_单独选择某一市场.jpg" alt="Market"><figcaption>Market list &amp; sector filter</figcaption></figure>
+    <figure><img loading="lazy" src="../assets/img/android_搜索栏.jpg" alt="Search"><figcaption>Code / name / pinyin search</figcaption></figure>
+    <figure><img loading="lazy" src="../assets/img/android_根据跌幅排序.jpg" alt="Sort"><figcaption>Sort by change %</figcaption></figure>
+    <figure><img loading="lazy" src="../assets/img/android_添加自选.jpg" alt="Watchlist"><figcaption>Watchlist management</figcaption></figure>
+    <figure><img loading="lazy" src="../assets/img/android_买入操作.jpg" alt="Buy"><figcaption>Buy order</figcaption></figure>
+    <figure><img loading="lazy" src="../assets/img/android_确认买入操作.jpg" alt="Confirm"><figcaption>Confirm buy</figcaption></figure>
+    <figure><img loading="lazy" src="../assets/img/android_查看持仓.jpg" alt="Positions"><figcaption>Positions</figcaption></figure>
+    <figure><img loading="lazy" src="../assets/img/android_查看交易记录.jpg" alt="Trades"><figcaption>Trade history</figcaption></figure>
+    <figure><img loading="lazy" src="../assets/img/android_日历交易数据.jpg" alt="Calendar"><figcaption>Trading calendar</figcaption></figure>
+    <figure><img loading="lazy" src="../assets/img/android_ai智能回答.jpg" alt="AI"><figcaption>AI assistant</figcaption></figure>
+    <figure><img loading="lazy" src="../assets/img/android_操作持仓股.jpg" alt="Position ops"><figcaption>Position operations</figcaption></figure>
+  </div>
+</section>
+
+<section class="block">
+  <h2>6. Screenshots — HarmonyOS</h2>
+  <div class="gallery">
+    <figure><img loading="lazy" src="../assets/img/harmony_登录首页.jpg" alt="Login"><figcaption>Login</figcaption></figure>
+    <figure><img loading="lazy" src="../assets/img/harmony_行情首页.jpg" alt="Market"><figcaption>Market home</figcaption></figure>
+    <figure><img loading="lazy" src="../assets/img/harmony_搜索自动查找.jpg" alt="Search"><figcaption>Search autocomplete</figcaption></figure>
+    <figure><img loading="lazy" src="../assets/img/harmony_单独查看某一市场股票.jpg" alt="Sector"><figcaption>Single-sector view</figcaption></figure>
+    <figure><img loading="lazy" src="../assets/img/harmony_根据跌幅排序股票.jpg" alt="Sort"><figcaption>Sort by decline</figcaption></figure>
+    <figure><img loading="lazy" src="../assets/img/harmony_添加股票到自选.jpg" alt="Watchlist"><figcaption>Add to watchlist</figcaption></figure>
+    <figure><img loading="lazy" src="../assets/img/harmony_绘制k线图.jpg" alt="K-line"><figcaption>Canvas K-line chart</figcaption></figure>
+    <figure><img loading="lazy" src="../assets/img/harmony_60分钟级别看线图.jpg" alt="60min"><figcaption>60-minute K-line</figcaption></figure>
+    <figure><img loading="lazy" src="../assets/img/harmony_用户选择买入交易.jpg" alt="Buy"><figcaption>Buy order</figcaption></figure>
+    <figure><img loading="lazy" src="../assets/img/harmony_卖出确认.jpg" alt="Sell"><figcaption>Sell confirmation</figcaption></figure>
+    <figure><img loading="lazy" src="../assets/img/harmony_查看我的持仓.jpg" alt="Positions"><figcaption>Positions</figcaption></figure>
+    <figure><img loading="lazy" src="../assets/img/harmony_每日收益曲线统计.jpg" alt="Equity"><figcaption>Daily equity curve</figcaption></figure>
+    <figure><img loading="lazy" src="../assets/img/harmony_通过日历查看每日操作.jpg" alt="Calendar"><figcaption>Trading calendar</figcaption></figure>
+    <figure><img loading="lazy" src="../assets/img/harmony_人工智能问题助手.jpg" alt="AI"><figcaption>AI assistant</figcaption></figure>
+  </div>
+</section>
+
+<section class="block">
+  <h2>7. Testing &amp; summary</h2>
+  <ul>
+    <li><strong>Module tests</strong>: login, quotes, search, K-line rendering (red-up / green-down), trade validation — all pass on both platforms;</li>
+    <li><strong>Integration tests</strong>: quotes → K-line → trading → positions data flow verified end to end;</li>
+    <li><strong>System tests</strong>: smooth full-app walkthrough on the Android emulator (API 25) and the HarmonyOS emulator.</li>
+  </ul>
+  <p>Building the same product twice — once per platform — gave me a comparative understanding of modern declarative UI frameworks (Compose vs. ArkUI), state-management paradigms (ViewModel/Flow vs. @StorageLink/@Watch) and mobile charting techniques.</p>
+</section>
+
+</main>
+
+<footer class="footer">
+  <div>© 2026 Kaiwen Chen · 112301228 · <a href="../index.html">Back to home</a></div>
+</footer>
+</body>
+</html>

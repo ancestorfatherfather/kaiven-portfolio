@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ML Portfolio Improvement Research — Kaiwen Chen</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+<nav class="nav">
+  <div class="wrap">
+    <span class="brand"><a href="../index.html" style="color:var(--text)">Kaiwen Chen's Portfolio</a></span>
+    <div class="links">
+      <a href="research.html">ML Research</a>
+      <a href="gongmu.html">Quant Strategy</a>
+      <a href="stockapp.html">Stock App</a>
+      <a href="video.html">Video</a>
+      <a href="opengl.html">3D Scene</a>
+    </div>
+  </div>
+</nav>
+
+<div class="page-head wrap">
+  <div class="crumb"><a href="../index.html">Home</a> / Project 1</div>
+  <h1>Machine Learning Portfolio Improvement Research</h1>
+  <p class="info">Research on Investment Portfolio Improvement via Machine Learning: Evidence from China's Stock Market · External research project (5-person team)</p>
+</div>
+
+<main class="wrap">
+
+<section class="block">
+  <h2>1. Overview</h2>
+  <p>This off-campus research project studies whether <strong>prediction-ranking discrepancies across machine learning models</strong> can improve portfolio performance on China's stock market, using SSE 50 constituent stocks as the sample. Five ML models are paired with three classic portfolio construction methods to form 15 combination paths, followed by multi-dimensional robustness tests — providing empirical guidance for model selection in scientific investment decisions.</p>
+  <table>
+    <tr><th>Type</th><td>External research project (5-person team; co-authors: Yuxiang Lian, Keyi Liu, Zhiguang Jin, Kaiwen Chen, Runxi Lu)</td></tr>
+    <tr><th>My contribution</th><td>Wrote the <strong>Methodology section</strong>; <strong>validated</strong> model predictions and backtest data locally (80% test coverage); handled paper <strong>typesetting</strong>; <strong>team coordination</strong> (task allocation, progress tracking, conflict resolution)</td></tr>
+    <tr><th>Method</th><td>5 ML models × 3 portfolio construction methods, rolling-window backtest</td></tr>
+    <tr><th>Sample</th><td>48 SSE 50 constituents, 2023-01-01 to 2025-03-15, hourly data (Wind, 254,784 records)</td></tr>
+  </table>
+</section>
+
+<section class="block">
+  <h2>2. Abstract (excerpt)</h2>
+  <div class="note">
+    With the advancement of AI and big data technologies, machine learning has been increasingly applied to financial asset allocation and stock investment. This study focuses on whether the predictive ranking discrepancies across different machine learning models can enhance portfolio performance. Five machine learning models and three classical portfolio construction methods are examined using SSE 50 constituent stocks. Empirical results indicate that under basic price–volume data, the predictive differences among models are limited; tree-based models and LSTM-based models yield differentiated stock selection, with LSTM-driven portfolios demonstrating superior performance. Risk parity and equal-weighted portfolios exhibit more stable risk–return profiles, while the maximum Sharpe ratio approach is more sensitive to the choice of predictive models. Robustness tests using new sample periods, 30-minute high-frequency data, and the SZSE 50 constituents further validate the consistency of these conclusions.
+    <br><br><em>Keywords: Deep learning; Return prediction; Portfolio models; Asset screening</em>
+  </div>
+</section>
+
+<section class="block">
+  <h2>3. Methodology (excerpt from my section)</h2>
+
+  <h3>3.1 Overall framework</h3>
+  <p>A <strong>rolling-window framework</strong> predicts 5-day-ahead return rankings from the previous 252 trading days of hourly data. Prediction models: Random Forest, XGBoost, LightGBM, LSTM and LSTM-Attention. Stocks are ranked by predicted return; the top 10% go long and the bottom 10% short. Portfolio weights are then computed by equal weight, risk parity or maximum Sharpe ratio; positions are held for 5 days and rebalanced on the latest data. Initial capital: ¥1,000,000, benchmarked against the SSE 50 Index.</p>
+
+  <h3>3.2 Five prediction models</h3>
+  <ul>
+    <li><strong>Random Forest</strong>: 100 trees, Gini splits, max depth 5, class_weight='balanced', seed 42;</li>
+    <li><strong>XGBoost</strong>: 10-class softmax, 100 trees, depth 5, learning rate 0.1, sample/feature ratios 0.8;</li>
+    <li><strong>LightGBM</strong>: histogram algorithm + leaf-wise growth, 31 leaves, learning rate 0.1;</li>
+    <li><strong>LSTM</strong>: 2 stacked layers, 100 hidden units, dropout 0.2, early-stopping patience 5;</li>
+    <li><strong>LSTM-Attention</strong>: 32 hidden units, 2 attention heads, 1 Transformer encoder layer, dropout 0.3 — dynamically weights the hidden-state sequence to focus on key temporal information.</li>
+  </ul>
+
+  <h3>3.3 Three portfolio construction methods</h3>
+  <ul>
+    <li><strong>Equal weight</strong>: identical weight (1/N) per stock, a hard-to-beat baseline;</li>
+    <li><strong>Risk parity</strong>: equal risk contribution from every asset, solved iteratively from the covariance matrix;</li>
+    <li><strong>Maximum Sharpe ratio (MSR)</strong>: maximizes excess return per unit volatility under constraints.</li>
+  </ul>
+
+  <h3>3.4 Data &amp; feature engineering</h3>
+  <p>Hourly OHLCV, turnover and transaction-count data from Wind for 48 constituents spanning finance, industrials, materials, consumer, IT and healthcare. Three feature families — technical indicators, market sentiment and multi-timeframe features — with pairwise correlation &gt; 0.8 removed. The label is the 5-day-ahead return rank in 10 grades (0–9).</p>
+</section>
+
+<section class="block">
+  <h2>4. Key results (excerpt)</h2>
+
+  <h3>4.1 Prediction results</h3>
+  <p>Across the first three rolling windows, tree models and time-series models selected <strong>identical</strong> top-10% / bottom-10% stocks, showing the models capture objective data patterns rather than idiosyncratic preferences. In later windows the top 10% remained fully overlapping; the bottom 10% differed by a single stock — tree models picked Montage Technology (688012) while time-series models picked GigaDevice (688008) — reflecting differences in how the two families capture risk information. Large-cap financial and infrastructure blue chips are the shared prediction difficulty of all models.</p>
+
+  <h3>4.2 Portfolio performance (test period from 2024-01-16)</h3>
+  <table>
+    <tr><th>Method</th><th>Tree models (ann.)</th><th>LSTM (ann.)</th><th>Risk profile</th></tr>
+    <tr><td>Equal weight</td><td>81.83%</td><td>82.94%</td><td>Moderate volatility, clearly beats SSE 50</td></tr>
+    <tr><td>Risk parity</td><td>108.11%</td><td>112.11%</td><td>~24.8% vol, ~-14.6% drawdown, best Sharpe/Sortino</td></tr>
+    <tr><td>Max Sharpe ratio</td><td>118.28%</td><td>123.30%</td><td>Highest return but 33.7%/52.0% vol — highly model-sensitive</td></tr>
+    <tr><td>SSE 50 Index</td><td colspan="2">Benchmark</td><td>Lowest return, lowest volatility</td></tr>
+  </table>
+
+  <h3>4.3 Robustness tests</h3>
+  <ol>
+    <li><strong>Extended backtest</strong> (to 2025-07-15): conclusions hold; risk parity attains the highest cumulative return;</li>
+    <li><strong>Changed frequency</strong> (30-minute data): equal weight and risk parity stay stable, MSR remains model-dependent; higher frequency even improves model performance;</li>
+    <li><strong>Switched sample</strong> (SZSE 50 constituents): conclusions replicate again.</li>
+  </ol>
+
+  <h3>4.4 Conclusion</h3>
+  <p>Risk parity offers the best return–risk balance; MSR is extremely sensitive to the prediction model chosen; in practice, <strong>Random Forest — with its low computational cost — paired with risk parity or equal weight already delivers considerable returns</strong>. The study provides empirical evidence for model selection and extends the application boundary of ML in stock investment.</p>
+</section>
+
+<section class="block">
+  <h2>5. My work summary</h2>
+  <ul>
+    <li>Methodology: wrote the principles, formulas and parameters of all five prediction models and three portfolio models;</li>
+    <li>Data validation: cross-checked model predictions and backtest metrics locally to ensure accuracy;</li>
+    <li>Typesetting: unified formatting, figure/table numbering and reference style;</li>
+    <li>Coordination: set the task split and timeline, mediated disagreements, kept the project on schedule.</li>
+  </ul>
+</section>
+
+</main>
+
+<footer class="footer">
+  <div>© 2026 Kaiwen Chen · 112301228 · <a href="../index.html">Back to home</a></div>
+</footer>
+</body>
+</html>
