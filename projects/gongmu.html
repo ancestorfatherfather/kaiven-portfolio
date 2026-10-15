@@ -210,6 +210,17 @@ class StrategyWithBullBearFilter:
     <img src="../assets/img/gongmu_zjcc_bull_bear_signals.jpg" alt="Bull/bear signals">
     <figcaption>Figure 2: Shareholder increase/decrease ratio regime signals vs. index</figcaption>
   </figure>
+
+  <h3>Comparison with the CSI 300 over the same period</h3>
+  <figure>
+    <img src="../assets/img/gongmu_vs_hs300.jpg" alt="Strategy vs CSI 300">
+    <figcaption>Figure 3: Cumulative NAV of the filtered strategy vs. the CSI 300 Index (both normalized to 1.0 on 2010-01-04). The strategy reaches 5.16× while the CSI 300 ends at 1.31×.</figcaption>
+  </figure>
+
+  <h3>Why is the Sharpe ratio relatively low?</h3>
+  <div class="note">
+    The headline Sharpe ratio (≈0.30) looks modest next to the 416% cumulative return — and the reason is structural, not a defect: <strong>in bear markets the strategy deliberately holds a single asset class — 2%-annual government bonds</strong> — for years at a time (e.g. most of 2011–2014 and 2016–2018, visible as the flat segments in Figure 3). During those stretches returns are compressed to the bond yield while the index keeps fluctuating, which drags down the return-to-volatility ratio over the full sample. This is the deliberate price of drawdown control: the bond phase is exactly what keeps the max drawdown at -21.9%~-30.0% and caps bear-year losses at single digits, trading Sharpe ratio for capital preservation through cycles.
+  </div>
 </section>
 
 <section class="block">
