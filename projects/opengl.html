@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>《雪庐夜话》3D 场景 — 陈凯文的作品集</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+<nav class="nav">
+  <div class="wrap">
+    <span class="brand"><a href="../index.html" style="color:var(--text)">陈凯文的作品集</a></span>
+    <div class="links">
+      <a href="dissertation.html">毕业论文</a>
+      <a href="gongmu.html">量化策略</a>
+      <a href="android.html">安卓开发</a>
+      <a href="harmony.html">鸿蒙开发</a>
+      <a href="video.html">视频创作</a>
+      <a href="opengl.html">3D 场景</a>
+    </div>
+  </div>
+</nav>
+
+<div class="page-head wrap">
+  <div class="crumb"><a href="../index.html">首页</a> / 附加课程项目</div>
+  <h1>《雪庐夜话》— OpenGL 三维场景</h1>
+  <p class="info">《3D 程序设计基础》期末作品 · C++ · OpenGL · 面向对象图形编程</p>
+</div>
+
+<main class="wrap">
+
+<section class="block">
+  <h2>一、项目概述</h2>
+  <p>期末综合作品《雪庐夜话》：用户控制一个 Demon 角色在血月笼罩的雪地中行走，大雪纷飞，角色走到雪屋旁遇到女巫并触发互动对话。以课程提供的 Lesson06 基础代码为框架，面向对象方式扩展出模型管理、摄像机、交互管理等类体系。</p>
+  <ul>
+    <li><strong>场景与地形</strong>：血月主题天空盒（替换六张 BMP 纹理，支持 stb_image 加载 PNG）；FBX 静态模型作为地形，3DS 模型加载女巫与火堆，双通道验证不同模型导入方案；</li>
+    <li><strong>动态角色</strong>：Mixamo 生成骨骼动画的 FBX 角色，自制动画状态机实现静止/行走/跑步/跳跃切换，碰撞检测实现地形起伏跟随；第三人称跟随摄像机；</li>
+    <li><strong>交互</strong>：DirectInput 键盘管理；F4 切换雪花粒子大小；靠近模型触发距离检测显示对话文本；L 键昼夜光照切换；</li>
+    <li><strong>光照与粒子</strong>：自写 Light 类管理光照参数（天空盒恒定、模型随光照模式变化）；火堆带点光源与距离衰减光晕；粒子系统降雪。</li>
+  </ul>
+</section>
+
+<section class="block">
+  <h2>二、功能截图</h2>
+  <div class="gallery">
+    <figure><img loading="lazy" src="../assets/img/opengl_01.jpg" alt="白天场景"><figcaption>白天场景</figcaption></figure>
+    <figure><img loading="lazy" src="../assets/img/opengl_02.jpg" alt="射线检测"><figcaption>射线检测 / 互动触发</figcaption></figure>
+    <figure><img loading="lazy" src="../assets/img/opengl_03.jpg" alt="黑夜关闭雪景"><figcaption>黑夜模式（关闭雪景）</figcaption></figure>
+    <figure><img loading="lazy" src="../assets/img/opengl_04.jpg" alt="火堆旁"><figcaption>火堆点光源效果</figcaption></figure>
+    <figure><img loading="lazy" src="../assets/img/opengl_05.jpg" alt="跳跃"><figcaption>角色跳跃动作</figcaption></figure>
+    <figure><img loading="lazy" src="../assets/img/opengl_06.jpg" alt="疾跑"><figcaption>角色疾跑动作</figcaption></figure>
+    <figure><img loading="lazy" src="../assets/img/opengl_07.jpg" alt="模型互动"><figcaption>与女巫模型互动</figcaption></figure>
+  </div>
+</section>
+
+<section class="block">
+  <h2>三、开发中的问题与解决</h2>
+  <ul>
+    <li><strong>模型贴图丢失</strong>：添加调试输出函数打印加载信息，定位为骨骼绑定导出设置问题并修正；</li>
+    <li><strong>坐标系统一</strong>：不同来源模型单位/坐标系不一致，用 printtext() 实时显示坐标，反复调试对齐到统一场景空间；</li>
+    <li><strong>版本管理教训</strong>：曾因操作失误丢失可用版本，此后养成"每个里程碑打压缩包备份"的习惯。</li>
+  </ul>
+  <p>本项目是对三维图形学与面向对象编程的综合实践，从环境构建、模型处理到交互设计与问题调试，加深了对计算机图形渲染管线的理解。</p>
+</section>
+
+</main>
+
+<footer class="footer">
+  <div>© 2026 陈凯文 · 112301228 · <a href="../index.html">返回首页</a></div>
+</footer>
+</body>
+</html>

@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>公募基金加仓策略量化回测 — 陈凯文的作品集</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+<nav class="nav">
+  <div class="wrap">
+    <span class="brand"><a href="../index.html" style="color:var(--text)">陈凯文的作品集</a></span>
+    <div class="links">
+      <a href="dissertation.html">毕业论文</a>
+      <a href="gongmu.html">量化策略</a>
+      <a href="android.html">安卓开发</a>
+      <a href="harmony.html">鸿蒙开发</a>
+      <a href="video.html">视频创作</a>
+      <a href="opengl.html">3D 场景</a>
+    </div>
+  </div>
+</nav>
+
+<div class="page-head wrap">
+  <div class="crumb"><a href="../index.html">首页</a> / 作品集项目 2</div>
+  <h1>公募基金加仓策略量化回测</h1>
+  <p class="info">个人项目 · Python · 事件驱动回测引擎 · 2010–2026 全历史检验</p>
+</div>
+
+<main class="wrap">
+
+<section class="block">
+  <h2>一、项目概述</h2>
+  <p>本项目是一个完整的 A 股量化策略研究：以公募基金季度持仓披露为基础，构建"<strong>基金增仓比例选股</strong>"策略，并创新性地加入基于<strong>股东增减持比值</strong>与<strong>三大指数回撤</strong>的牛熊筛选前置机制——熊市清仓转入国债避险，牛市执行选股组合，从而在长周期回测中显著改善风险收益特征。</p>
+  <ul>
+    <li><strong>选股逻辑</strong>：每季度基金报告披露日（5/1、9/1、11/1），按公募基金增仓比例排序买入前 5 只股票；</li>
+    <li><strong>牛熊规则</strong>：过去 3 个月全市场"减持公司家数 / 增持公司家数"比值 &gt; 2 视为熊转牛候选，再经上证（回撤 15%）、深证成指（20%）、创业板指（25%）及 260 日均线确认；牛转熊信号触发即按月末收盘价清仓，转入年化 2% 国债计息；</li>
+    <li><strong>持仓加权</strong>：支持等权与风险平价两种方案（建仓日前 120 交易日窗口估计协方差，迭代求解风险贡献均衡权重）；</li>
+    <li><strong>数据管道</strong>：akshare / 东方财富 datacenter API 获取增减持数据，baostock 获取指数与个股行情，本地 CSV 缓存。</li>
+  </ul>
+</section>
+
+<section class="block">
+  <h2>二、关键代码</h2>
+
+  <h3>2.1 牛熊筛选器（核心创新点）</h3>
+  <p>基于股东增减持家数比值 + 指数回撤确认的状态机：</p>
+  <pre><code>&quot;&quot;&quot;
+牛熊筛选前置指标 —— 股东增减持比值（替换旧的&quot;成交额排名前5%个股成交额占比&quot;指标）
+
+主指标：过去3个月内所有上市公司的增减持记录
+    比值 = 减持公司家数 / 增持公司家数
+    - 比值 &gt; 2 → 可能进入牛市（熊转牛候选）
+    - 比值 &lt; 2 → 可能进入熊市（牛转熊）
+
+回撤确认指标（仅当比值 &gt; 2 时启用）：
+    上证指数、深证成指、创业板指 自近250个交易日高点的回撤
+    - 上证回撤超15% / 深证成指回撤超20% / 创业板指回撤超25%
+    - 或任一指数跌破260日均线
+    → 回撤指标满足，判断熊市来临
+
+状态机（信号按月末采样，当月末收盘价执行）：
+    牛市 = 比值 &gt; 2 且 回撤指标未触发
+    熊市 = 其他情况（比值 &lt;= 2，或比值 &gt; 2 但回撤指标触发）
+    - 熊转牛 → 执行公募基金增仓比例策略
+    - 牛转熊 → 直接清仓，全仓持有国债（年化1.5%），直至下一次熊转牛信号
+
+数据来源：
+    - 增减持数据：akshare stock_ggcg_em（东方财富-数据中心-特色数据-股东增减持），
+      akshare不可用时直连东方财富 datacenter API（任意版本akshare均可）
+    - 指数行情：baostock（sh.000001 / sz.399001 / sz.399006），
+      baostock不可用时回退 akshare（新浪财经 stock_zh_index_daily）
+&quot;&quot;&quot;
+
+class ZengJianChiBullBearFilter:
+    &quot;&quot;&quot;股东增减持比值 + 指数回撤 牛熊筛选指标&quot;&quot;&quot;
+
+    # 三大指数配置: (baostock代码, akshare/新浪代码, 名称, 回撤阈值)
+    INDEX_CONFIG = [
+        (&#x27;sh.000001&#x27;, &#x27;sh000001&#x27;, &#x27;上证指数&#x27;, 0.15),
+        (&#x27;sz.399001&#x27;, &#x27;sz399001&#x27;, &#x27;深证成指&#x27;, 0.20),
+        (&#x27;sz.399006&#x27;, &#x27;sz399006&#x27;, &#x27;创业板指&#x27;, 0.25),
+    ]
+
+    def __init__(self, start_date=&#x27;2010-01-01&#x27;, end_date=&#x27;2026-08-31&#x27;,
+                 ratio_threshold=2.0, lookback_months=3, peak_window=250,
+                 ma_window=260, bond_annual_return=0.015, cache_refresh_days=7):
+        &quot;&quot;&quot;
+        :param ratio_threshold: 牛熊分界比值（减持家数/增持家数），默认2
+        :param lookback_months: 增减持统计回看月数，默认3个月
+        :param peak_window: 计算回撤的高点回看窗口（交易日），默认250
+        :param ma_window: 均线窗口，默认260日
+        :param bond_annual_return: 熊市国债年化收益率，默认1.5%
+        :param cache_refresh_days: 增减持缓存过期天数
+        &quot;&quot;&quot;
+        self.start_date = start_date
+        self.end_date = end_date
+        self.ratio_threshold = ratio_threshold
+        self.lookback_months = lookback_months
+        self.peak_window = peak_window
+        self.ma_window = ma_window
+        self.bond_annual_return = bond_annual_return
+        self.cache_refresh_days = cache_refresh_days
+
+        # 数据路径
+        self.data_path = os.path.dirname(os.path.abspath(__file__))
+        self.data_dir = os.path.join(self.data_path, &#x27;data&#x27;)
+        self.market_data_path = os.path.join(self.data_dir, &#x27;market_data&#x27;)
+        self.index_data_path = os.path.join(self.data_dir, &#x27;index_data&#x27;)
+        self.results_path = os.path.join(self.data_dir, &#x27;results&#x27;)
+</code></pre>
+
+  <h3>2.2 策略主体：季度事件驱动回测引擎</h3>
+  <pre><code>&quot;&quot;&quot;
+基金增仓策略 + 牛熊筛选回测（股东增减持比值指标）
+
+牛熊规则（前置指标，见 bull_bear_filter_zengjianchi.py）：
+    - 熊转牛（减持/增持家数比值 &gt; 2 且 指数回撤指标未触发）→ 执行公募基金增仓比例策略
+    - 牛转熊 → 直接清仓，全仓买入年化2%的国债，直至下一次熊转牛信号
+
+回测引擎（月度事件驱动）：
+    - 每季度基金报告披露日（5/1、9/1、11/1）买入当季增仓比例前5只
+    - 每月末检查牛熊信号，当月末收盘价执行：
+        牛转熊 → 当月末收盘价清仓，转入国债计息
+        熊转牛 → 当月末收盘价买入当前季度选股组合
+    - 国债期间按年化2%复利计息（实际天数/365）
+
+持仓加权方案（每次建仓/调仓时估计，仅用建仓日及之前的数据，持仓期内不调权）：
+    equal         等权（每只 1/N）
+    risk_parity   风险平价（各资产风险贡献相等，协方差迭代求解，失败回退逆波动率）
+    估计窗口：建仓日前约120个交易日的日收益率；数据不足时回退等权
+&quot;&quot;&quot;
+
+class StrategyWithBullBearFilter:
+    &quot;&quot;&quot;基金增仓策略 + 增减持比值牛熊筛选&quot;&quot;&quot;
+
+    def __init__(self, start_date=&#x27;2010-01-01&#x27;, end_date=&#x27;2026-08-31&#x27;,
+                 initial_capital=1000000, top_n=5, bond_annual_return=0.02):
+        # top_n: 持仓股票数，只持有公募基金增仓比例前N只（默认5只）
+        self.start_date = start_date
+        self.end_date = end_date
+        self.initial_capital = initial_capital
+        self.top_n = top_n
+        self.bond_annual_return = bond_annual_return
+        self.est_window = 120  # 风险平价/均值方差的权重估计窗口（交易日）
+
+        # 数据路径
+        self.data_path = os.path.dirname(os.path.abspath(__file__))
+        self.data_dir = os.path.join(self.data_path, &#x27;data&#x27;)
+        self.results_path = os.path.join(self.data_dir, &#x27;results&#x27;)
+        os.makedirs(self.results_path, exist_ok=True)
+
+        # 初始化策略模块
+        self.fund_strategy = FundIncreaseStrategySimple(
+            start_date=start_date,
+            end_date=end_date,
+            initial_capital=initial_capital,
+            top_n=top_n
+        )
+
+        self.bull_bear_filter = ZengJianChiBullBearFilter(
+            start_date=start_date,
+            end_date=end_date,
+            bond_annual_return=bond_annual_return
+        )
+
+        self.backtest_results = {}
+
+
+    def run_backtest(self):
+        &quot;&quot;&quot;运行回测：普通策略 vs 牛熊筛选策略&quot;&quot;&quot;
+        print(&quot;=&quot; * 80)
+        print(&quot;基金增仓策略 + 牛熊筛选回测（股东增减持比值指标）&quot;)
+        print(&quot;=&quot; * 80)
+
+        # 1. 牛熊信号
+        print(&quot;\n[1/3] 计算牛熊筛选信号...&quot;)
+        signals = self.bull_bear_filter.generate_signals()
+        if signals.empty:
+            print(&quot;无法生成牛熊信号，回测终止&quot;)
+            return
+        self.bull_bear_filter.cleanup()
+
+        # 2. 基金增仓选股结果
+        print(&quot;\n[2/3] 获取基金增仓策略选股结果...&quot;)
+        fund_selections = self._get_fund_selections()
+        if not fund_selections:
+            print(&quot;无选股结果，回测终止&quot;)
+            return
+
+        # 3. 回测
+        print(&quot;\n[3/3] 运行回测...&quot;)</code></pre>
+</section>
+
+<section class="block">
+  <h2>三、回测结果</h2>
+  <p>初始资金 100 万元，回测区间 2010-01-01 至 2026-08-31，月度事件驱动撮合：</p>
+  <table>
+    <tr><th>指标</th><th>基金增仓 + 牛熊筛选（等权）</th><th>基金增仓 + 牛熊筛选（风险平价）</th></tr>
+    <tr><td>累计收益</td><td><strong>416.1%</strong></td><td>355.9%</td></tr>
+    <tr><td>年化收益</td><td>10.34%</td><td>9.53%</td></tr>
+    <tr><td>最大回撤</td><td>-30.0%</td><td><strong>-21.9%</strong></td></tr>
+    <tr><td>胜率</td><td>50.0%</td><td>48.5%</td></tr>
+  </table>
+  <p>年度收益分布显示策略在牛市年份弹性充足（2015 年 +107.8%、2021 年 +46.0%、2025 年 +38.7%），熊市年份依靠国债避险将亏损控制在个位数（2018 年 +2.0% 即国债收益），风险平价方案回撤进一步收窄至 -21.9%。</p>
+
+  <figure>
+    <img src="../assets/img/gongmu_strategy_comparison_with_filter.jpg" alt="策略对比净值曲线">
+    <figcaption>图 1：加筛选策略与基准的净值对比</figcaption>
+  </figure>
+  <figure>
+    <img src="../assets/img/gongmu_zjcc_bull_bear_signals.jpg" alt="牛熊信号图">
+    <figcaption>图 2：股东增减持比值牛熊信号与指数走势</figcaption>
+  </figure>
+</section>
+
+<section class="block">
+  <h2>四、技术要点</h2>
+  <ul>
+    <li>事件驱动回测引擎：季度调仓 + 月末信号检查，国债期间按实际天数/365 复利计息；</li>
+    <li>风险平价权重求解：协方差迭代法，数值失败时回退逆波动率法，数据不足时回退等权；</li>
+    <li>数据鲁棒性：akshare 不可用时直连东方财富 API，baostock 不可用时回退新浪接口，本地缓存过期机制；</li>
+    <li>可视化：matplotlib 中文字体适配，输出净值曲线、牛熊信号、年度收益热力图等。</li>
+  </ul>
+</section>
+
+</main>
+
+<footer class="footer">
+  <div>© 2026 陈凯文 · 112301228 · <a href="../index.html">返回首页</a></div>
+</footer>
+</body>
+</html>
